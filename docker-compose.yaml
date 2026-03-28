@@ -1,0 +1,65 @@
+services:
+  traefik:
+    image: "traefik:v3.6"
+    container_name: "traefik"
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - magot_network
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    env_file:
+      - .env
+    command:
+      # API & Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=magot_network"
+      # EntryPoints (Web & Websecure)
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      # HTTP Redirections (Force HTTPS)
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # Let's Encrypt configuration (DNS Challenge)
+      - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.le.acme.email=${EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      # Observability
+      - "--log.level=debug"
+      - "--accesslog=true"
+    labels:
+      # Dashboard router
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik_dash.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)"
+      - "traefik.http.routers.traefik_dash.entrypoints=websecure"
+      - "traefik.http.routers.traefik_dash.service=api@internal"
+      # Basic‑auth middleware
+      - "traefik.http.middlewares.traefik_dash-auth.basicauth.users=${TRAEFIK_DASHBOARD_PASSWORD}"
+      - "traefik.http.routers.traefik_dash.middlewares=traefik_dash-auth@docker"
+
+  whoami:
+    image: traefik/whoami
+    container_name: whoami
+    restart: always
+    networks:
+      - magot_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`${WHOAMI_HOST}`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=le"
+
+networks:
+  magot_network:
+    name: magot_network

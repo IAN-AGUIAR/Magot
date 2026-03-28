@@ -1,0 +1,11 @@
+# Variáveis de ambiente
+.env
+
+# Certificados do Traefik
+acme.json
+
+# Logs
+*.log
+
+# Dados dos bancos e serviços (Volumes)
+
